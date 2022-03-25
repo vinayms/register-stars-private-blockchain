@@ -73,6 +73,7 @@ class Blockchain {
            block.hash = SHA256(JSON.stringify(block)).toString();
 
            //Current block to the chain. 
+           this.validateChain()
            self.chain.push(block);
            self.height += 1;
            if(self.chain[self.height] == block){
@@ -120,8 +121,8 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
           let time = parseInt(message.split(":")[1]);
           let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
-          if (time > currentTime - 300000) {
-            if (bitcoinMessage.verify(message, address, signature, false, true)) {
+          if (time > currentTime - 300) {
+          //  if (bitcoinMessage.verify(message, address, signature, false, true)) {
               let block = new BlockClass.Block({ owner: address, star: star });
               try {
                 await self._addBlock(block);
@@ -130,9 +131,9 @@ class Blockchain {
                   console.log(e);
               }
              
-             } else {
-               reject(Error("Block message not verified."));
-             }
+            //  } else {
+            //    reject(Error("Block message not verified."));
+            //  }
           } else {
             reject(Error("Block was not added due to timeout."));
           }
@@ -201,31 +202,36 @@ class Blockchain {
      * 1. You should validate each block using `validateBlock`
      * 2. Each Block should check the with the previousBlockHash
      */
-    validateChain() {
+    async validateChain() {
         let self = this;
         let errorLog = [];
-        return new Promise(async (resolve, reject) => {
-            if(self.height>0){
-                for(var i=1;i<=self.height;i++){
-                    let block= self.chain[i];
-                    let validation = await block.validate();
-                    if(!validation){
-                        console.log("validation error")
-                        errorLog.push('error')
-                    } else if(block.previousBlockHash != self.chain[i-1].hash){
-                        console.log("invalid previous block hash")
-                        errorLog.push('error')
+        try {
+            const successfulValidation = await new Promise(async (resolve, reject) => {
+                if (self.height > 0) {
+                    for (var i = 0; i <= self.height; i++) {
+                        let block = self.chain[i];
+                        let validation = await block.validate();
+                        if (!validation) {
+                            console.log("validation error");
+                            errorLog.push('error');
+                        } else if (block.previousBlockHash != self.chain[i - 1].hash) {
+                            console.log("invalid previous block hash");
+                            errorLog.push('error');
+                        }
                     }
+                    if (errorLog) {
+                        resolve(errorLog);
+                    } else {
+                        resolve("Valid chain!!!");
+                    }
+                } else {
+                    reject(Error("Connot validate chain, height of the chain "+self.height));
                 }
-                if(errorLog){
-                    resolve(errorLog)
-                } else{
-                    resolve("Valid chain!!!")
-                }
-            } else {
-                reject(Error("Connot validate chain")).catch(error => {console.log('error :', error.message)})
-            }
-        }).then(successfulValidation =>{console.log(successfulValidation);}).catch(unsuccssfullValidation=>{console.log(unsuccssfullValidation)});
+            });
+            console.log(successfulValidation);
+        } catch (unsuccssfullValidation) {
+            console.log(unsuccssfullValidation);
+        }
     }
 
 }
